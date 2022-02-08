@@ -66,6 +66,11 @@ func main() {
 			crawling = append(crawling, host)
 		}
 
+		if len(crawling) == 0 {
+			log.Println("No new peers to crawl. Sleeping for 1 minute...")
+			stats()
+			time.Sleep(1*time.Minute)
+		}
 		// Setup progress bar
 		bar := progressbar.Default(int64(len(crawling)))
 		for _, host := range crawling {
