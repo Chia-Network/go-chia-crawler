@@ -10,8 +10,11 @@ import (
 
 	"github.com/cmmarslender/go-chia-lib/pkg/protocols"
 	"github.com/cmmarslender/go-chia-protocol/pkg/protocol"
+	"github.com/schollz/progressbar/v3"
 	"gopkg.in/go-playground/pool.v3"
 )
+
+const poolSize = 100
 
 // Tracks the best "last connected" timestamp from either us or other peers on the network
 var hostTimestampsLock sync.Mutex
@@ -33,11 +36,11 @@ func main() {
 	lastAttempts = map[string]time.Time{}
 
 	// Create a pool of workers
-	pool := pool.NewLimited(100)
-	defer pool.Close()
+	primaryPool := pool.NewLimited(poolSize)
+	defer primaryPool.Close()
 
-	initialBatch := pool.Batch()
-	initialBatch.Queue(processPeers("10.0.3.11"))
+	initialBatch := primaryPool.Batch()
+	initialBatch.Queue(processPeers("10.0.3.11", nil))
 	initialBatch.QueueComplete()
 	initialBatch.WaitAll()
 
@@ -45,26 +48,31 @@ func main() {
 	stats()
 
 	for {
-		skippingTooRecent := 0
-		crawling := 0
+		skippingTooRecent := []string{}
+		crawling := []string{}
 
 		log.Println()
 		log.Println("Starting new batch...")
-		batch := pool.Batch()
+		batch := primaryPool.Batch()
 		hostTimestampsLock.Lock()
 		lastAttemptsLock.Lock()
 		for host := range hostTimestamps {
 			if lastAttempts[host].After(time.Now().Add(-10*time.Minute)) {
-				skippingTooRecent++
+				skippingTooRecent = append(skippingTooRecent, host)
 				continue
 			}
-			crawling++
-			batch.Queue(processPeers(host))
+			crawling = append(crawling, host)
+		}
+
+		// Setup progress bar
+		bar := progressbar.Default(int64(len(crawling)))
+		for _, host := range crawling {
+			batch.Queue(processPeers(host, bar))
 		}
 		lastAttemptsLock.Unlock()
 		hostTimestampsLock.Unlock()
 		batch.QueueComplete()
-		log.Printf("Queue complete. Crawling %d hosts. Skipping %d hosts.\n", crawling, skippingTooRecent)
+		log.Printf("Queue complete. Crawling %d hosts. Skipping %d hosts.\n", len(crawling), len(skippingTooRecent))
 		batch.WaitAll()
 		stats()
 		log.Println("Batch Complete")
@@ -98,7 +106,7 @@ func stats() {
 	time.Sleep(5 * time.Second)
 }
 
-func processPeers(host string) pool.WorkFunc {
+func processPeers(host string, bar *progressbar.ProgressBar) pool.WorkFunc {
 	return func(wu pool.WorkUnit) (interface{}, error) {
 		// Skip canceled work units
 		if wu.IsCancelled() {
@@ -106,6 +114,9 @@ func processPeers(host string) pool.WorkFunc {
 		}
 
 		err := requestPeersFrom(host)
+		if bar != nil {
+			bar.Add(1)
+		}
 		return nil, err
 	}
 }
@@ -166,7 +177,7 @@ func requestPeersFrom(host string) error {
 			time.Sleep(1*time.Second)
 			if ctx.Err() != nil {
 				if ctx.Err() == context.DeadlineExceeded {
-					log.Println("Closing connection. Took too long.")
+					//log.Println("Closing connection. Took too long.")
 					conn.Close()
 				}
 				return
