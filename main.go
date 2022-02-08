@@ -14,7 +14,8 @@ import (
 	"gopkg.in/go-playground/pool.v3"
 )
 
-const poolSize = 100
+const poolSize = 1000
+const recrawlAfter = 1 * time.Hour
 
 // Tracks the best "last connected" timestamp from either us or other peers on the network
 var hostTimestampsLock sync.Mutex
@@ -57,7 +58,7 @@ func main() {
 		hostTimestampsLock.Lock()
 		lastAttemptsLock.Lock()
 		for host := range hostTimestamps {
-			if lastAttempts[host].After(time.Now().Add(-10*time.Minute)) {
+			if lastAttempts[host].After(time.Now().Add(-recrawlAfter)) {
 				skippingTooRecent = append(skippingTooRecent, host)
 				continue
 			}
