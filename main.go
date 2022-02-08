@@ -16,6 +16,7 @@ import (
 
 const poolSize = 1000
 const recrawlAfter = 1 * time.Hour
+const respondPeersTimeout = 10 * time.Second
 
 // Tracks the best "last connected" timestamp from either us or other peers on the network
 var hostTimestampsLock sync.Mutex
@@ -133,17 +134,17 @@ func requestPeersFrom(host string) error {
 	lastAttempts[host] = time.Now()
 	lastAttemptsLock.Unlock()
 
+	// Assume failed by default
+	// Set truck once we get a handshake
+	attemptedIPsLock.Lock()
+	attemptedIPs[host] = false
+	attemptedIPsLock.Unlock()
+
 	conn, err := protocol.NewConnection(&ip, protocol.WithHandshakeTimeout(2 * time.Second))
 	if err != nil {
-		attemptedIPsLock.Lock()
-		attemptedIPs[host] = false
-		attemptedIPsLock.Unlock()
 		return err
 	}
 	defer conn.Close()
-	attemptedIPsLock.Lock()
-	attemptedIPs[host] = true
-	attemptedIPsLock.Unlock()
 
 	err = conn.Handshake()
 	if err != nil {
@@ -162,6 +163,10 @@ func requestPeersFrom(host string) error {
 			hostTimestampsLock.Lock()
 			hostTimestamps[host] = uint64(time.Now().Unix())
 			hostTimestampsLock.Unlock()
+
+			attemptedIPsLock.Lock()
+			attemptedIPs[host] = true
+			attemptedIPsLock.Unlock()
 			break
 		}
 	}
@@ -172,7 +177,7 @@ func requestPeersFrom(host string) error {
 	}
 
 	// Really hacky way to set a deadline - should use channel instead probably
-	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), respondPeersTimeout)
 	go func(ctx context.Context) {
 		for {
 			time.Sleep(1*time.Second)
