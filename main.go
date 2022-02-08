@@ -140,7 +140,7 @@ func requestPeersFrom(host string) error {
 	attemptedIPs[host] = false
 	attemptedIPsLock.Unlock()
 
-	conn, err := protocol.NewConnection(&ip, protocol.WithHandshakeTimeout(2 * time.Second))
+	conn, err := protocol.NewConnection(&ip, protocol.WithHandshakeTimeout(5 * time.Second))
 	if err != nil {
 		return err
 	}
