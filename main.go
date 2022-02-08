@@ -13,16 +13,24 @@ import (
 	"gopkg.in/go-playground/pool.v3"
 )
 
+// Tracks the best "last connected" timestamp from either us or other peers on the network
 var hostTimestampsLock sync.Mutex
 var hostTimestamps map[string]uint64
 
+// Tracks success/fail status for a given host as of the last attempt
 var attemptedIPsLock sync.Mutex
 var attemptedIPs map[string]bool
+
+// Tracks the last connection attempt for a host
+// Used to avoid trying peers too frequently
+var lastAttemptsLock sync.Mutex
+var lastAttempts map[string]time.Time
 
 func main() {
 	// init the timestamp map
 	hostTimestamps = map[string]uint64{}
 	attemptedIPs = map[string]bool{}
+	lastAttempts = map[string]time.Time{}
 
 	// Create a pool of workers
 	pool := pool.NewLimited(100)
@@ -37,17 +45,29 @@ func main() {
 	stats()
 
 	for {
+		skippingTooRecent := 0
+		crawling := 0
+
+		log.Println()
+		log.Println("Starting new batch...")
 		batch := pool.Batch()
 		hostTimestampsLock.Lock()
+		lastAttemptsLock.Lock()
 		for host := range hostTimestamps {
+			if lastAttempts[host].After(time.Now().Add(-10*time.Minute)) {
+				skippingTooRecent++
+				continue
+			}
+			crawling++
 			batch.Queue(processPeers(host))
 		}
+		lastAttemptsLock.Unlock()
 		hostTimestampsLock.Unlock()
 		batch.QueueComplete()
+		log.Printf("Queue complete. Crawling %d hosts. Skipping %d hosts.\n", crawling, skippingTooRecent)
 		batch.WaitAll()
-		log.Println("Batch Complete")
 		stats()
-		time.Sleep(1*time.Second)
+		log.Println("Batch Complete")
 	}
 }
 
@@ -95,6 +115,12 @@ func requestPeersFrom(host string) error {
 	if ip == nil {
 		return fmt.Errorf("unable to parse ip for host: %s", host)
 	}
+
+	// Track the last time for this host
+	lastAttemptsLock.Lock()
+	lastAttempts[host] = time.Now()
+	lastAttemptsLock.Unlock()
+
 	conn, err := protocol.NewConnection(&ip, protocol.WithHandshakeTimeout(2 * time.Second))
 	if err != nil {
 		attemptedIPsLock.Lock()
