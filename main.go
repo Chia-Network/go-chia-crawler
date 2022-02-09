@@ -65,19 +65,20 @@ func main() {
 			}
 			crawling = append(crawling, host)
 		}
+		lastAttemptsLock.Unlock()
+		hostTimestampsLock.Unlock()
 
 		if len(crawling) == 0 {
 			log.Println("No new peers to crawl. Sleeping for 1 minute...")
 			stats()
 			time.Sleep(1*time.Minute)
+			continue
 		}
 		// Setup progress bar
 		bar := progressbar.Default(int64(len(crawling)))
 		for _, host := range crawling {
 			batch.Queue(processPeers(host, bar))
 		}
-		lastAttemptsLock.Unlock()
-		hostTimestampsLock.Unlock()
 		batch.QueueComplete()
 		log.Printf("Queue complete. Crawling %d hosts. Skipping %d hosts.\n", len(crawling), len(skippingTooRecent))
 		batch.WaitAll()
