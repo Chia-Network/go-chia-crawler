@@ -92,13 +92,20 @@ func main() {
 
 func stats() {
 	last5Days := 0
+	v6count := 0
+	v4count := 0
 
 	hostTimestampsLock.Lock()
-	for _, timestamp := range hostTimestamps {
+	for ip, timestamp := range hostTimestamps {
 		if int64(timestamp) < time.Now().Add(-5*time.Hour*24).Unix() {
 			continue
 		}
 		last5Days++
+		if isV6(ip) {
+			v6count++
+		} else {
+			v4count++
+		}
 	}
 	hostTimestampsLock.Unlock()
 
@@ -114,6 +121,7 @@ func stats() {
 	}
 	attemptedIPsLock.Unlock()
 	log.Printf("Have %d Total Peers. %d with timestamps last 5 days. %d Success. %d Failed.\n", len(hostTimestamps), last5Days, success, failed)
+	log.Printf("IPv4 5 days: %d | IPv6 5 days: %d\n", v4count, v6count)
 	time.Sleep(5 * time.Second)
 }
 
@@ -239,4 +247,16 @@ func handlePeers(msg *protocols.Message) error {
 	}
 
 	return nil
+}
+
+func isV6(s string) bool {
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '.':
+			return false
+		case ':':
+			return true
+		}
+	}
+	return false
 }
