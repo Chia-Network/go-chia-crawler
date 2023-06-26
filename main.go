@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -41,8 +42,10 @@ func main() {
 	primaryPool := pool.NewLimited(poolSize)
 	defer primaryPool.Close()
 
+	initialHost := os.Args[1]
+
 	initialBatch := primaryPool.Batch()
-	initialBatch.Queue(processPeers("10.0.3.11", nil))
+	initialBatch.Queue(processPeers(initialHost, nil))
 	initialBatch.QueueComplete()
 	initialBatch.WaitAll()
 
@@ -71,7 +74,7 @@ func main() {
 		if len(crawling) == 0 {
 			log.Println("No new peers to crawl. Sleeping for 1 minute...")
 			stats()
-			time.Sleep(1*time.Minute)
+			time.Sleep(1 * time.Minute)
 			continue
 		}
 		// Setup progress bar
@@ -92,7 +95,7 @@ func stats() {
 
 	hostTimestampsLock.Lock()
 	for _, timestamp := range hostTimestamps {
-		if int64(timestamp) < time.Now().Add(-5 * time.Hour * 24).Unix() {
+		if int64(timestamp) < time.Now().Add(-5*time.Hour*24).Unix() {
 			continue
 		}
 		last5Days++
@@ -146,7 +149,7 @@ func requestPeersFrom(host string) error {
 	attemptedIPs[host] = false
 	attemptedIPsLock.Unlock()
 
-	conn, err := protocol.NewConnection(&ip, protocol.WithHandshakeTimeout(5 * time.Second))
+	conn, err := protocol.NewConnection(&ip, protocol.WithHandshakeTimeout(5*time.Second))
 	if err != nil {
 		return err
 	}
@@ -186,7 +189,7 @@ func requestPeersFrom(host string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), respondPeersTimeout)
 	go func(ctx context.Context) {
 		for {
-			time.Sleep(1*time.Second)
+			time.Sleep(1 * time.Second)
 			if ctx.Err() != nil {
 				if ctx.Err() == context.DeadlineExceeded {
 					//log.Println("Closing connection. Took too long.")
