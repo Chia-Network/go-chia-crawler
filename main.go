@@ -7,12 +7,16 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"sync"
 	"time"
 
+	wrappedPrometheus "github.com/chia-network/go-modules/pkg/prometheus"
 	"github.com/cmmarslender/go-chia-lib/pkg/protocols"
 	"github.com/cmmarslender/go-chia-protocol/pkg/protocol"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/schollz/progressbar/v3"
 	"gopkg.in/go-playground/pool.v3"
 )
@@ -34,9 +38,14 @@ var attemptedIPs map[string]bool
 var lastAttemptsLock sync.Mutex
 var lastAttempts map[string]time.Time
 
-func main() {
-	// init the timestamp map
+// Prometheus Metrics
+// This holds a custom prometheus registry so that only our metrics are exported, and not the default go metrics
+var prometheusRegistry *prometheus.Registry
+var totalNodes5Days *wrappedPrometheus.LazyGauge
+var ipv4Nodes5Days *wrappedPrometheus.LazyGauge
+var ipv6Nodes5Days *wrappedPrometheus.LazyGauge
 
+func main() {
 	// All IPs we know about, and the best timestamp we've seen (from us or a peer)
 	// map[ip]timestamp
 	hostTimestamps = map[string]uint64{}
@@ -49,13 +58,26 @@ func main() {
 	// map[ip]lastAttemptTime
 	lastAttempts = map[string]time.Time{}
 
+	prometheusRegistry = prometheus.NewRegistry()
+	totalNodes5Days = newGauge("total_nodes_5_days", "Total number of nodes that have been gossiped around the network with a timestamp in the last 5 days. The crawler did not necessarily connect to all of these peers itself.")
+	ipv4Nodes5Days = newGauge("ipv4_nodes_5_days", "Total number of IPv4 nodes that have been gossiped around the network with a timestamp in the last 5 days. The crawler did not necessarily connect to all of these peers itself.")
+	ipv6Nodes5Days = newGauge("ipv6_nodes_5_days", "Total number of IPv6 nodes that have been gossiped around the network with a timestamp in the last 5 days. The crawler did not necessarily connect to all of these peers itself.")
+	go func() {
+		err := StartServer()
+		if err != nil {
+			log.Printf("Error starting prometheus server: %s\n", err.Error())
+		}
+	}()
+
 	// Create a pool of workers
 	primaryPool := pool.NewLimited(poolSize)
 	defer primaryPool.Close()
 
 	initialHost := os.Args[1]
 
+	// Load peers from datafile and show stats (and update prom values) before requesting peers so we have data
 	load()
+	stats()
 
 	initialBatch := primaryPool.Batch()
 	if len(hostTimestamps) == 0 {
@@ -143,6 +165,9 @@ func stats() {
 		}
 	}
 	attemptedIPsLock.Unlock()
+	totalNodes5Days.Set(float64(last5Days))
+	ipv4Nodes5Days.Set(float64(v4count))
+	ipv6Nodes5Days.Set(float64(v6count))
 	log.Printf("Have %d Total Peers. %d with timestamps last 5 days. %d Success. %d Failed.\n", len(hostTimestamps), last5Days, success, failed)
 	log.Printf("IPv4 5 days: %d | IPv6 5 days: %d\n", v4count, v6count)
 	time.Sleep(5 * time.Second)
@@ -360,4 +385,31 @@ func isV6(s string) bool {
 		}
 	}
 	return false
+}
+
+// newGauge returns a lazy gauge that follows naming conventions
+func newGauge(name string, help string) *wrappedPrometheus.LazyGauge {
+	opts := prometheus.GaugeOpts{
+		Namespace: "chia",
+		Subsystem: "crawler",
+		Name:      name,
+		Help:      help,
+	}
+
+	gm := prometheus.NewGauge(opts)
+
+	lg := &wrappedPrometheus.LazyGauge{
+		Gauge:    gm,
+		Registry: prometheusRegistry,
+	}
+
+	return lg
+}
+
+// StartServer starts the metrics server
+func StartServer() error {
+	log.Printf("Starting metrics server on port %d", 9914)
+
+	http.Handle("/metrics", promhttp.HandlerFor(prometheusRegistry, promhttp.HandlerOpts{}))
+	return http.ListenAndServe(fmt.Sprintf(":%d", 9914), nil)
 }
