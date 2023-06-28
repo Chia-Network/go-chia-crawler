@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/gob"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -34,8 +36,17 @@ var lastAttempts map[string]time.Time
 
 func main() {
 	// init the timestamp map
+
+	// All IPs we know about, and the best timestamp we've seen (from us or a peer)
+	// map[ip]timestamp
 	hostTimestamps = map[string]uint64{}
+
+	// Whether we were able to connect to the IP when we tried
+	// map[ip]successfulConnection
 	attemptedIPs = map[string]bool{}
+
+	// The last time we attempted to connect to this peer
+	// map[ip]lastAttemptTime
 	lastAttempts = map[string]time.Time{}
 
 	// Create a pool of workers
@@ -44,12 +55,23 @@ func main() {
 
 	initialHost := os.Args[1]
 
+	load()
+
 	initialBatch := primaryPool.Batch()
-	initialBatch.Queue(processPeers(initialHost, nil))
+	if len(hostTimestamps) == 0 {
+		log.Println("No peers in datafile, checking bootstrap peer")
+		initialBatch.Queue(processPeers(initialHost, nil))
+	} else {
+		log.Println("Checking all peers from datafile")
+		bar := progressbar.Default(int64(len(hostTimestamps)))
+		for ip := range hostTimestamps {
+			initialBatch.Queue(processPeers(ip, bar))
+		}
+	}
 	initialBatch.QueueComplete()
 	initialBatch.WaitAll()
-
 	log.Println("initial batch complete")
+	persist()
 	stats()
 
 	for {
@@ -72,7 +94,7 @@ func main() {
 		hostTimestampsLock.Unlock()
 
 		if len(crawling) == 0 {
-			log.Println("No new peers to crawl. Sleeping for 1 minute...")
+			log.Printf("No new peers to crawl (%d too recent). Sleeping for 1 minute...", len(skippingTooRecent))
 			stats()
 			time.Sleep(1 * time.Minute)
 			continue
@@ -83,10 +105,11 @@ func main() {
 			batch.Queue(processPeers(host, bar))
 		}
 		batch.QueueComplete()
-		log.Printf("Queue complete. Crawling %d hosts. Skipping %d hosts.\n", len(crawling), len(skippingTooRecent))
 		batch.WaitAll()
 		stats()
 		log.Println("Batch Complete")
+		persist()
+		log.Println("Done")
 	}
 }
 
@@ -125,6 +148,84 @@ func stats() {
 	time.Sleep(5 * time.Second)
 }
 
+type persistedRecord struct {
+	IP            string
+	BestTimestamp uint64
+	LastAttempt   time.Time
+}
+
+func persist() {
+	log.Println("Persisting peers to crawler.dat")
+	// Iterate through the hostTimestamps, and for each host that meets the reporting threshold, save all the details about it
+
+	file, err := os.Create("crawler.dat")
+	if err != nil {
+		log.Printf("Error writing data: %s\n", err.Error())
+		return
+	}
+	enc := gob.NewEncoder(file)
+
+	hostTimestampsLock.Lock()
+	attemptedIPsLock.Lock()
+	defer hostTimestampsLock.Unlock()
+	defer attemptedIPsLock.Unlock()
+
+	for ip, timestamp := range hostTimestamps {
+		if int64(timestamp) < time.Now().Add(-5*time.Hour*24).Unix() {
+			// Host was last seen over 5 days ago
+			// Skipped from writing to the data file and clean up the maps
+			delete(hostTimestamps, ip)
+			if _, ok := attemptedIPs[ip]; ok {
+				delete(attemptedIPs, ip)
+			}
+			if _, ok := lastAttempts[ip]; ok {
+				delete(lastAttempts, ip)
+			}
+			continue
+		}
+
+		record := persistedRecord{
+			IP:            ip,
+			BestTimestamp: timestamp,
+			LastAttempt:   lastAttempts[ip],
+		}
+		err = enc.Encode(record)
+		if err != nil {
+			log.Printf("Error encoding: %s\n", err.Error())
+		}
+	}
+}
+
+func load() {
+	log.Println("Checking for peers in crawler.dat")
+	file, err := os.Open("crawler.dat")
+	if err != nil {
+		log.Printf("Error opening data file: %s\n", err.Error())
+		return
+	}
+	dec := gob.NewDecoder(file)
+
+	hostTimestampsLock.Lock()
+	attemptedIPsLock.Lock()
+	defer hostTimestampsLock.Unlock()
+	defer attemptedIPsLock.Unlock()
+
+	record := persistedRecord{}
+	for {
+		err = dec.Decode(&record)
+		if err != nil {
+			if err == io.EOF {
+				return
+			}
+			log.Printf("Error decoding: %s\n", err.Error())
+			return
+		}
+		hostTimestamps[record.IP] = record.BestTimestamp
+		attemptedIPs[record.IP] = false
+		lastAttempts[record.IP] = record.LastAttempt
+	}
+}
+
 func processPeers(host string, bar *progressbar.ProgressBar) pool.WorkFunc {
 	return func(wu pool.WorkUnit) (interface{}, error) {
 		// Skip canceled work units
@@ -152,7 +253,7 @@ func requestPeersFrom(host string) error {
 	lastAttemptsLock.Unlock()
 
 	// Assume failed by default
-	// Set truck once we get a handshake
+	// Set true once we get a handshake
 	attemptedIPsLock.Lock()
 	attemptedIPs[host] = false
 	attemptedIPsLock.Unlock()
