@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/gob"
 	"fmt"
 	"io"
@@ -300,7 +299,7 @@ func requestPeersFrom(host string) error {
 
 	// Read until we get the handshake ack
 	for {
-		msg, err := conn.ReadOne()
+		msg, err := conn.ReadOne(5 * time.Second)
 		if err != nil {
 			return err
 		}
@@ -323,25 +322,9 @@ func requestPeersFrom(host string) error {
 		return err
 	}
 
-	// Really hacky way to set a deadline - should use channel instead probably
-	ctx, cancel := context.WithTimeout(context.Background(), respondPeersTimeout)
-	go func(ctx context.Context) {
-		for {
-			time.Sleep(1 * time.Second)
-			if ctx.Err() != nil {
-				if ctx.Err() == context.DeadlineExceeded {
-					//log.Println("Closing connection. Took too long.")
-					conn.Close()
-				}
-				return
-			}
-		}
-	}(ctx)
-	defer cancel()
-
-	// Read until we get the respond_peers or it gets cancelled
+	// Read until we get the respond_peers response
 	for {
-		msg, err := conn.ReadOne()
+		msg, err := conn.ReadOne(5 * time.Second)
 		if err != nil {
 			return err
 		}
@@ -349,8 +332,6 @@ func requestPeersFrom(host string) error {
 		if msg.ProtocolMessageType == protocols.ProtocolMessageTypeRespondPeers {
 			return handlePeers(msg)
 		}
-
-		// @TODO possibly like.. give up if we dont get a respond peers after so many seconds
 	}
 }
 
