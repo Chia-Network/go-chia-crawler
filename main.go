@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chia-network/go-chia-libs/pkg/peerprotocol"
+	"github.com/chia-network/go-chia-libs/pkg/protocols"
 	wrappedPrometheus "github.com/chia-network/go-modules/pkg/prometheus"
-	"github.com/cmmarslender/go-chia-lib/pkg/protocols"
-	"github.com/cmmarslender/go-chia-protocol/pkg/protocol"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/schollz/progressbar/v3"
@@ -286,7 +286,7 @@ func requestPeersFrom(host string) error {
 	attemptedIPs[host] = false
 	attemptedIPsLock.Unlock()
 
-	conn, err := protocol.NewConnection(&ip, protocol.WithHandshakeTimeout(5*time.Second))
+	conn, err := peerprotocol.NewConnection(&ip, peerprotocol.WithHandshakeTimeout(5*time.Second))
 	if err != nil {
 		return err
 	}
@@ -317,7 +317,11 @@ func requestPeersFrom(host string) error {
 		}
 	}
 
-	err = conn.RequestPeers()
+	fullNodeProtocol, err := peerprotocol.NewFullNodeProtocol(conn)
+	if err != nil {
+		return err
+	}
+	err = fullNodeProtocol.RequestPeers()
 	if err != nil {
 		return err
 	}
