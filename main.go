@@ -86,9 +86,13 @@ func main() {
 	} else {
 		log.Println("Checking all peers from datafile")
 		bar := progressbar.Default(int64(len(hostTimestamps)))
+		hostTimestampsLock.Lock()
+		lastAttemptsLock.Lock()
 		for ip := range hostTimestamps {
 			initialBatch.Queue(processPeers(ip, bar))
 		}
+		lastAttemptsLock.Unlock()
+		hostTimestampsLock.Unlock()
 	}
 	initialBatch.QueueComplete()
 	initialBatch.WaitAll()
