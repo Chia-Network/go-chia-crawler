@@ -22,7 +22,8 @@ import (
 
 const poolSize = 1000
 const recrawlAfter = 1 * time.Hour
-const respondPeersTimeout = 10 * time.Second
+const handshakeTimeout = 5 * time.Second
+const respondPeersTimeout = 5 * time.Second
 
 // Tracks the best "last connected" timestamp from either us or other peers on the network
 var hostTimestampsLock sync.Mutex
@@ -203,12 +204,8 @@ func persist() {
 			// Host was last seen over 5 days ago
 			// Skipped from writing to the data file and clean up the maps
 			delete(hostTimestamps, ip)
-			if _, ok := attemptedIPs[ip]; ok {
-				delete(attemptedIPs, ip)
-			}
-			if _, ok := lastAttempts[ip]; ok {
-				delete(lastAttempts, ip)
-			}
+			delete(attemptedIPs, ip)
+			delete(lastAttempts, ip)
 			continue
 		}
 
@@ -263,7 +260,7 @@ func processPeers(host string, bar *progressbar.ProgressBar) pool.WorkFunc {
 
 		err := requestPeersFrom(host)
 		if bar != nil {
-			bar.Add(1)
+			_ = bar.Add(1)
 		}
 		return nil, err
 	}
@@ -286,7 +283,7 @@ func requestPeersFrom(host string) error {
 	attemptedIPs[host] = false
 	attemptedIPsLock.Unlock()
 
-	conn, err := peerprotocol.NewConnection(&ip, peerprotocol.WithHandshakeTimeout(5*time.Second))
+	conn, err := peerprotocol.NewConnection(&ip, peerprotocol.WithHandshakeTimeout(handshakeTimeout))
 	if err != nil {
 		return err
 	}
@@ -299,7 +296,7 @@ func requestPeersFrom(host string) error {
 
 	// Read until we get the handshake ack
 	for {
-		msg, err := conn.ReadOne(5 * time.Second)
+		msg, err := conn.ReadOne(handshakeTimeout)
 		if err != nil {
 			return err
 		}
@@ -328,7 +325,7 @@ func requestPeersFrom(host string) error {
 
 	// Read until we get the respond_peers response
 	for {
-		msg, err := conn.ReadOne(5 * time.Second)
+		msg, err := conn.ReadOne(respondPeersTimeout)
 		if err != nil {
 			return err
 		}
