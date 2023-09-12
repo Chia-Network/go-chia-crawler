@@ -9,6 +9,7 @@ import (
 
 	"github.com/chia-network/go-chia-libs/pkg/peerprotocol"
 	"github.com/chia-network/go-chia-libs/pkg/protocols"
+	"github.com/chia-network/go-chia-libs/pkg/types"
 	"github.com/chia-network/go-chia-libs/pkg/util"
 	wrappedPrometheus "github.com/chia-network/go-modules/pkg/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
@@ -114,13 +115,19 @@ func requestHeightFrom(host string) error {
 			if err != nil {
 				return fmt.Errorf("error shifting first 32 bytes: %s", err.Error())
 			}
-			heightBytes, _, err := util.ShiftNBytes(32, data)
+			heightBytes, data, err := util.ShiftNBytes(4, data)
 			if err != nil {
 				return fmt.Errorf("error shifting 4 bytes for height: %s", err.Error())
+			}
+			weightBytes, _, err := util.ShiftNBytes(16, data)
+			if err != nil {
+				return fmt.Errorf("error shifting 16 bytes for weight: %s", err.Error())
 			}
 
 			newInt := util.BytesToUint32(heightBytes)
 			log.Printf("Height is %d\n", newInt)
+			newWeight := types.Uint128FromBytes(weightBytes)
+			log.Printf("Weight is %s\n", newWeight.String())
 			nonChip13Height.Set(float64(newInt))
 			break
 		}
