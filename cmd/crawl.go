@@ -32,7 +32,7 @@ var crawlCmd = &cobra.Command{
 	Short: "Runs the crawler and optional metrics server",
 	Run: func(cmd *cobra.Command, args []string) {
 		prometheusRegistry = prometheus.NewRegistry()
-		nonChip13Height = newGauge("total_nodes_5_days", "Total number of nodes that have been gossiped around the network with a timestamp in the last 5 days. The crawler did not necessarily connect to all of these peers itself.")
+		nonChip13Height = newGauge("non_chip_13_node_height", "Height of non chip-13 chain")
 		if viper.GetBool("metrics") {
 			go func() {
 				err := StartServer()
