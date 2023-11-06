@@ -7,7 +7,7 @@ require (
 	github.com/chia-network/go-modules v0.0.4
 	github.com/prometheus/client_golang v1.16.0
 	github.com/schollz/progressbar/v3 v3.13.1
-	github.com/spf13/cobra v1.7.0
+	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.16.0
 	gopkg.in/go-playground/pool.v3 v3.1.1
 )
