@@ -3,7 +3,7 @@ module github.com/cmmarslender/go-chia-crawler
 go 1.21
 
 require (
-	github.com/chia-network/go-chia-libs v0.7.0
+	github.com/chia-network/go-chia-libs v0.7.1
 	github.com/chia-network/go-modules v0.0.4
 	github.com/prometheus/client_golang v1.19.0
 	github.com/schollz/progressbar/v3 v3.14.2
