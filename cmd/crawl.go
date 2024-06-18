@@ -282,7 +282,15 @@ func processPeers(host string, bar *progressbar.ProgressBar) pool.WorkFunc {
 func requestPeersFrom(host string) error {
 	ip := net.ParseIP(host)
 	if ip == nil {
-		return fmt.Errorf("unable to parse ip for host: %s", host)
+		// Try to resolve a DNS name
+		ips, err := net.LookupIP(host)
+		if err != nil {
+			return fmt.Errorf("unable to parse as IP and DNS lookup failed for %s: %s", host, err.Error())
+		}
+		if len(ips) == 0 {
+			return fmt.Errorf("dns lookup returned 0 IPs for %s", host)
+		}
+		ip = ips[0]
 	}
 
 	// Track the last time for this host
