@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/chia-network/go-chia-libs v0.8.2
-	github.com/chia-network/go-modules v0.0.4
+	github.com/chia-network/go-modules v0.0.5
 	github.com/prometheus/client_golang v1.19.1
 	github.com/schollz/progressbar/v3 v3.14.4
 	github.com/spf13/cobra v1.8.1
