@@ -22,7 +22,7 @@ jobs:
 
   deploy:
     name: Deploy
-    runs-on: "k8s-internal-${{ matrix.colo.region }}"
+    runs-on: "k8s-public-${{ matrix.colo.region }}"
     needs:
       - package
     container:
@@ -42,7 +42,7 @@ jobs:
         uses: Chia-Network/actions/vault/login@main
         with:
           vault_url: ${{ secrets.VAULT_URL }}
-          role_name: github
+          role_name: github-go-chia-crawler
 
       - name: Get secrets from vault
         uses: hashicorp/vault-action@v3
