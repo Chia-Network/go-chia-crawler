@@ -1,0 +1,87 @@
+name: Deploy & Configure Application
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  schedule:
+    - cron: '0 10 * * 1'
+
+permissions:
+  id-token: write
+  contents: read
+  packages: write
+
+concurrency:
+  group: "build-deploy"
+
+jobs:
+  package:
+    uses: Chia-Network/actions/.github/workflows/docker-build.yaml@main
+
+  deploy:
+    name: Deploy
+    runs-on: "k8s-internal-${{ matrix.colo.region }}"
+    needs:
+      - package
+    container:
+      image: registry.gitlab.com/cmmarslender/kubectl-helm:v3
+    strategy:
+      fail-fast: false
+      matrix:
+        colo:
+          - region: fmt
+          - region: msp
+          - region: ldn
+          - region: sin
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vault Login
+        uses: Chia-Network/actions/vault/login@main
+        with:
+          vault_url: ${{ secrets.VAULT_URL }}
+          role_name: github
+
+      - name: Get secrets from vault
+        uses: hashicorp/vault-action@v3
+        with:
+          url: ${{ secrets.VAULT_URL }}
+          token: ${{ env.VAULT_TOKEN }}
+          secrets: |
+            secret/data/${{ matrix.colo.region }}/k8s/k8s-${{ matrix.colo.region }} api_server_url | K8S_API_SERVER_URL;
+            secret/data/github/ghcr_image_pull username | IMAGE_PULL_USERNAME;
+            secret/data/github/ghcr_image_pull password | IMAGE_PULL_PASSWORD;
+
+      - name: Login to k8s cluster
+        uses: Chia-Network/actions/vault/k8s-login@main
+        with:
+          vault_url: ${{ secrets.VAULT_URL }}
+          vault_token: ${{ env.VAULT_TOKEN }}
+          backend_name: k8s-${{ matrix.colo.region }}
+          role_name: github-actions
+          cluster_url: ${{ env.K8S_API_SERVER_URL }}
+
+      - uses: Chia-Network/actions/k8s/image-pull-secret@main
+        with:
+          secret_name: crawler-image-pull
+          namespace: go-chia-crawler
+          username: ${{ env.IMAGE_PULL_USERNAME }}
+          password: ${{ env.IMAGE_PULL_PASSWORD }}
+          docker_server: "ghcr.io"
+
+      - name: Ensure istio injection is enabled
+        run: |
+          kubectl label namespace go-chia-crawler istio-injection=enabled
+
+      - uses: Chia-Network/actions/helm/deploy@main
+        env:
+          DOCKER_TAG: "sha-${{ inputs.deploy_ref }}"
+          REGION: ${{ matrix.colo.region }}
+        with:
+          namespace: go-chia-crawler
+          app_name: "crawler"
+          helm_chart_repo: "https://chia-network.github.io/helm-charts"
+          helm_chart: "generic"
+          helm_values: "./k8s/values.yaml"

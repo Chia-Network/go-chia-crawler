@@ -1,0 +1,43 @@
+image:
+  repository: ghcr.io/chia-network/go-chia-crawler
+  tag: {{ DOCKER_TAG }}
+
+imagePullSecrets:
+  - name: crawler-image-pull
+
+deployment:
+  containerPort: 9914
+  containerPortName: metrics
+
+service:
+  enabled: true
+  type: ClusterIP
+  additionalLabels:
+    application: chia-blockchain
+    component: dns-introducer
+    network: mainnet
+  port: 9914
+
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Egress
+  egressRules:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: chia-blockchain-mainnet
+      ports:
+        - protocol: TCP
+          port: 8444
+
+configmapEnvironment:
+  CHIA_CRAWLER_BOOTSTRAP_PEER: node-node-all.chia-blockchain-mainnet
+  CHIA_CRAWLER_DATA_DIR: /crawler-data
+
+volumes:
+  - name: crawler-data
+    mountPath: /crawler-data
+    readOnly: false
+    size: 256Mi
+    storageClassName: ceph-nvme

@@ -27,21 +27,17 @@ func Execute() {
 }
 
 func init() {
-	var (
-		bootstrapPeer string
-		metrics       bool
-		metricsPort   int
-	)
-
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&bootstrapPeer, "bootstrap-peer", "node.chia.net", "The initial bootstrap peer to try and connect to")
-	rootCmd.PersistentFlags().BoolVar(&metrics, "metrics", false, "Enable the metrics server")
-	rootCmd.PersistentFlags().IntVar(&metricsPort, "metrics-port", 9914, "The port the metrics server binds to")
+	rootCmd.PersistentFlags().String("bootstrap-peer", "node.chia.net", "The initial bootstrap peer to try and connect to")
+	rootCmd.PersistentFlags().Bool("metrics", false, "Enable the metrics server")
+	rootCmd.PersistentFlags().Int("metrics-port", 9914, "The port the metrics server binds to")
+	rootCmd.PersistentFlags().String("data-dir", "", "The directory to store crawler data in")
 
 	cobra.CheckErr(viper.BindPFlag("bootstrap-peer", rootCmd.PersistentFlags().Lookup("bootstrap-peer")))
 	cobra.CheckErr(viper.BindPFlag("metrics", rootCmd.PersistentFlags().Lookup("metrics")))
 	cobra.CheckErr(viper.BindPFlag("metrics-port", rootCmd.PersistentFlags().Lookup("metrics-port")))
+	cobra.CheckErr(viper.BindPFlag("data-dir", rootCmd.PersistentFlags().Lookup("data-dir")))
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.chia-crawler.yaml)")
 }
