@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"sync"
 	"time"
 
@@ -200,7 +201,7 @@ func persist() {
 	log.Println("Persisting peers to crawler.dat")
 	// Iterate through the hostTimestamps, and for each host that meets the reporting threshold, save all the details about it
 
-	file, err := os.Create("crawler.dat")
+	file, err := os.Create(path.Join(viper.GetString("data-dir"), "crawler.dat"))
 	if err != nil {
 		log.Printf("Error writing data: %s\n", err.Error())
 		return
@@ -236,7 +237,7 @@ func persist() {
 
 func load() {
 	log.Println("Checking for peers in crawler.dat")
-	file, err := os.Open("crawler.dat")
+	file, err := os.Open(path.Join(viper.GetString("data-dir"), "crawler.dat"))
 	if err != nil {
 		log.Printf("Error opening data file: %s\n", err.Error())
 		return
