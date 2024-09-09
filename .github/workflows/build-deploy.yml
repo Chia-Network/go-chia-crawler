@@ -77,8 +77,7 @@ jobs:
 
       - uses: Chia-Network/actions/helm/deploy@main
         env:
-          DOCKER_TAG: "sha-${{ inputs.deploy_ref }}"
-          REGION: ${{ matrix.colo.region }}
+          DOCKER_TAG: "sha-${{ github.sha }}"
         with:
           namespace: go-chia-crawler
           app_name: "crawler"
