@@ -12,8 +12,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chia-network/go-chia-libs/pkg/config"
 	"github.com/chia-network/go-chia-libs/pkg/peerprotocol"
 	"github.com/chia-network/go-chia-libs/pkg/protocols"
+	"github.com/chia-network/go-chia-libs/pkg/tls"
 	wrappedPrometheus "github.com/chia-network/go-modules/pkg/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -21,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/go-playground/pool.v3"
+	"gopkg.in/yaml.v3"
 )
 
 const poolSize = 1000
@@ -53,6 +56,9 @@ var crawlCmd = &cobra.Command{
 	Use:   "crawl",
 	Short: "Runs the crawler and optional metrics server",
 	Run: func(cmd *cobra.Command, args []string) {
+		// Checking for certs/chia root/etc
+		ensureChiaRoot()
+
 		// All IPs we know about, and the best timestamp we've seen (from us or a peer)
 		// map[ip]timestamp
 		hostTimestamps = map[string]uint64{}
@@ -151,6 +157,64 @@ var crawlCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(crawlCmd)
+}
+
+func ensureChiaRoot() {
+	chiaRoot, err := config.GetChiaRootPath()
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+
+	// Check if the directory exists
+	_, err = os.Stat(chiaRoot)
+	if os.IsNotExist(err) {
+		// Directory doesn't exist, create it
+		err = os.MkdirAll(chiaRoot, os.ModePerm)
+		if err != nil {
+			log.Fatalln("Failed to create chia root directory:", err.Error())
+		}
+	}
+
+	// Generate certs if the config/ssl directory doesn't exist
+	sslDir := path.Join(chiaRoot, "config", "ssl")
+	_, err = os.Stat(sslDir)
+	if os.IsNotExist(err) {
+		// Directory doesn't exist, generate the certs
+		err = tls.GenerateAllCerts(sslDir)
+		if err != nil {
+			log.Fatalln("Error generating chia certs:", err.Error())
+		}
+	} else if err != nil {
+		log.Fatalln("Error checking ssl directory:", err.Error())
+	}
+
+	configPath := path.Join(chiaRoot, "config", "config.yaml")
+
+	// Check if config.yaml exists
+	_, err = os.Stat(configPath)
+	if os.IsNotExist(err) {
+		// Config file doesn't exist, create it
+		cfg, err := config.LoadDefaultConfig()
+		if err != nil {
+			log.Fatalln("Error loading default config:", err.Error())
+		}
+
+		// Marshal the config struct to YAML
+		data, err := yaml.Marshal(cfg)
+		if err != nil {
+			log.Fatalln("Error marshalling config to YAML:", err.Error())
+		}
+
+		// Write the YAML data to config.yaml
+		err = os.WriteFile(configPath, data, 0644)
+		if err != nil {
+			log.Fatalln("Error writing config.yaml:", err.Error())
+		}
+
+		log.Println("Config.yaml successfully created")
+	} else if err != nil {
+		log.Fatalln("Error checking config.yaml:", err.Error())
+	}
 }
 
 func stats() {
@@ -275,6 +339,9 @@ func processPeers(host string, bar *progressbar.ProgressBar) pool.WorkFunc {
 		err := requestPeersFrom(host)
 		if bar != nil {
 			_ = bar.Add(1)
+		}
+		if err != nil {
+			log.Println(err.Error())
 		}
 		return nil, err
 	}
