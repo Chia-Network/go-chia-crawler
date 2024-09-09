@@ -22,7 +22,7 @@ jobs:
 
   deploy:
     name: Deploy
-    runs-on: "k8s-internal-${{ matrix.colo.region }}"
+    runs-on: "k8s-public-${{ matrix.colo.region }}"
     needs:
       - package
     container:
