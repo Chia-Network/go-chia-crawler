@@ -3,13 +3,14 @@ module github.com/cmmarslender/go-chia-crawler
 go 1.21
 
 require (
-	github.com/chia-network/go-chia-libs v0.9.1
+	github.com/chia-network/go-chia-libs v0.9.2
 	github.com/chia-network/go-modules v0.0.5
 	github.com/prometheus/client_golang v1.20.3
 	github.com/schollz/progressbar/v3 v3.14.6
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	gopkg.in/go-playground/pool.v3 v3.1.1
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -46,5 +47,4 @@ require (
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/go-playground/assert.v1 v1.2.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
