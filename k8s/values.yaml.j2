@@ -8,6 +8,8 @@ imagePullSecrets:
 deployment:
   containerPort: 9914
   containerPortName: metrics
+  strategy:
+    type: Recreate
 
 service:
   enabled: true
