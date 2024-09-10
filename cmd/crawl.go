@@ -135,10 +135,17 @@ var crawlCmd = &cobra.Command{
 			hostTimestampsLock.Unlock()
 
 			if len(crawling) == 0 {
-				log.Printf("No new peers to crawl (%d too recent). Sleeping for 1 minute...", len(skippingTooRecent))
-				stats()
-				time.Sleep(1 * time.Minute)
-				continue
+				if len(skippingTooRecent) == 0 {
+					// No crawling and none too recent means none at all
+					// Try bootstrap again
+					log.Println("No peers, checking bootstrap peer")
+					crawling = append(crawling, initialHost)
+				} else {
+					log.Printf("No new peers to crawl (%d too recent). Sleeping for 1 minute...", len(skippingTooRecent))
+					stats()
+					time.Sleep(1 * time.Minute)
+					continue
+				}
 			}
 			// Setup progress bar
 			bar := progressbar.Default(int64(len(crawling)))
