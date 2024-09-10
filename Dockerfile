@@ -5,7 +5,7 @@ WORKDIR /app
 
 RUN make build
 
-FROM gcr.io/distroless/static-debian12
+FROM golang:1
 
 COPY --from=builder /app/bin/go-chia-crawler /go-chia-crawler
 
