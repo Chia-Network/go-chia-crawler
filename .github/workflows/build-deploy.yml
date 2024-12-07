@@ -73,7 +73,7 @@ jobs:
 
       - name: Ensure istio injection is enabled
         run: |
-          kubectl label namespace go-chia-crawler istio-injection=enabled
+          kubectl label namespace go-chia-crawler istio-injection=disabled --overwrite
 
       - uses: Chia-Network/actions/helm/deploy@main
         env:
