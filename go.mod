@@ -2,15 +2,13 @@ module github.com/cmmarslender/go-chia-crawler
 
 go 1.22
 
-toolchain go1.23.1
-
 require (
 	github.com/chia-network/go-chia-libs v0.21.0
 	github.com/chia-network/go-modules v0.0.8
 	github.com/prometheus/client_golang v1.21.1
 	github.com/schollz/progressbar/v3 v3.18.0
 	github.com/spf13/cobra v1.9.1
-	github.com/spf13/viper v1.20.0
+	github.com/spf13/viper v1.20.1
 	gopkg.in/go-playground/pool.v3 v3.1.1
 	gopkg.in/yaml.v3 v3.0.1
 )
