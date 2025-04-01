@@ -187,7 +187,7 @@ func ensureChiaRoot() {
 	_, err = os.Stat(sslDir)
 	if os.IsNotExist(err) {
 		// Directory doesn't exist, generate the certs
-		err = tls.GenerateAllCerts(sslDir, nil, nil)
+		err = tls.GenerateAndWriteAllCerts(sslDir, nil, nil)
 		if err != nil {
 			log.Fatalln("Error generating chia certs:", err.Error())
 		}
