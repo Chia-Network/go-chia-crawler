@@ -20,7 +20,7 @@ jobs:
       - uses: Chia-Network/actions/git-mark-workspace-safe@main
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Build Binary
         env:
@@ -46,7 +46,7 @@ jobs:
       - uses: Chia-Network/actions/git-mark-workspace-safe@main
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install fpm
         run: sudo gem install fpm
@@ -93,7 +93,7 @@ jobs:
       - uses: Chia-Network/actions/git-mark-workspace-safe@main
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - uses: actions/download-artifact@v4
         with:
