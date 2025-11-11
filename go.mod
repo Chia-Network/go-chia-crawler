@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.24.1
 
 require (
-	github.com/chia-network/go-chia-libs v0.23.1
+	github.com/chia-network/go-chia-libs v0.24.2
 	github.com/chia-network/go-modules v0.0.9
 	github.com/prometheus/client_golang v1.23.2
 	github.com/schollz/progressbar/v3 v3.18.0
