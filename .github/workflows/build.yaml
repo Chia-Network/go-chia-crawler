@@ -29,7 +29,7 @@ jobs:
         run: make build
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: go-chia-crawler-${{ matrix.GOOS }}-${{ matrix.GOARCH }}
           path: ${{ github.workspace }}/bin/go-chia-crawler*
@@ -79,7 +79,7 @@ jobs:
           mv *.deb installer-out/
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: installer-go-chia-crawler-${{ matrix.GOOS }}-${{ matrix.GOARCH }}
           path: ${{ github.workspace }}/installer-out/*.deb
