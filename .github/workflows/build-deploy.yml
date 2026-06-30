@@ -36,7 +36,7 @@ jobs:
           - region: zrh
           - region: sin
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Vault Login
         uses: Chia-Network/actions/vault/login@main
